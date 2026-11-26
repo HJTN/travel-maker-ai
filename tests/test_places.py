@@ -30,7 +30,7 @@ def test_coordinates_within_tokyo_day_trip_range():
 
 
 def test_quiz_concepts_have_enough_candidates():
-    quiz_concepts = {concept for question in QUIZ for _, concept in question if concept}
+    quiz_concepts = {concept for options in QUIZ.values() for _, concept in options.values() if concept}
     counts = {c: sum(c in p["concepts"] for p in PLACES) for c in quiz_concepts}
 
     # 분리/번갈아에서 고를 수 있도록 컨셉당 2곳 이상을 목표로 한다

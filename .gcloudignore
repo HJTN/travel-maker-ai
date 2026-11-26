@@ -1,0 +1,11 @@
+.gcloudignore
+.git/
+.gitignore
+.superpowers/
+.venv/
+.env
+tests/
+docs/
+.claude/
+__pycache__/
+.pytest_cache/

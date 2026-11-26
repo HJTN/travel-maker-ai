@@ -4,6 +4,7 @@
 LLM 은 장소를 후보 id 로만 고르고, 이름·좌표는 후보 데이터로 덮어쓴다.
 """
 
+import asyncio
 import datetime as dt
 import json
 
@@ -23,18 +24,19 @@ SYSTEM_PROMPT = """너는 동행자들의 서로 다른 취향을 조율해 일�
 
 일정 항목의 mode 규칙:
 - common: 공통 컨셉(comparison.common, 모든 참여자가 고른 컨셉)의 장소에만 쓴다. 공통 컨셉이 없거나 다 썼으면 common 대신 alternate 를 쓴다.
-- alternate: 한 사람의 취향 장소에 다 같이 가며, pickedBy 에 그 컨셉을 고른 참여자 id 를 넣는다. 차이 컨셉 중 mode 가 alternate 인 것을 먼저 쓰고, separate 한도를 넘는 separate 컨셉도 alternate 로 쓸 수 있다. 하루 안에서 서로의 취향이 번갈아, 사람별로 고르게 나오게 한다.
+- alternate: 한 사람의 취향 장소에 다 같이 가며, picked_by 에 그 컨셉을 고른 참여자 id 를 넣는다. 차이 컨셉 중 mode 가 alternate 인 것을 먼저 쓰고, separate 한도를 넘는 separate 컨셉도 alternate 로 쓸 수 있다. 하루 안에서 서로의 취향이 번갈아, 사람별로 고르게 나오게 한다.
 - separate: 차이 컨셉 중 mode 가 separate 인 것. 같은 시간대에 그룹별로 다른 장소에 간다. separate 배열에 그룹을 2개 이상 넣고, 모든 참여자가 정확히 한 그룹에 속해야 한다.
 
 지켜야 할 것:
 - 장소는 반드시 후보 목록의 id 로만 고른다. 목록에 없는 장소를 만들지 않는다.
-- 장소는 그곳에 가는 사람의 취향이어야 한다: common 은 전원, alternate 는 pickedBy 전원, separate 는 그룹원 전원이 고른 컨셉(participants[].concepts)을 그 장소의 concepts 에 가지고 있어야 한다. place.concept 은 그 컨셉이다.
+- 장소는 그곳에 가는 사람의 취향이어야 한다: common 은 전원, alternate 는 picked_by 전원, separate 는 그룹원 전원이 고른 컨셉(participants[].concepts)을 그 장소의 concepts 에 가지고 있어야 한다. place.concept 은 그 컨셉이다.
 - 하루 separate 항목은 최대 {max_separate}개.
 - 하루 일정은 약 {items_per_day}개, 시간은 "HH:MM" 24시간제, 겹치지 않게 오름차순.
 - 이동 수단({transport})을 고려해 하루 일정은 가까운 권역(area)끼리 묶는다. 근교 장소는 하루를 통째로 쓸 때만 넣는다.
 - 예산({budget})에 맞게 고른다.
 - reason 에는 누구의 어떤 취향 때문에 골랐는지 참여자 이름으로 한 문장 쓴다. description 은 장소 소개 한두 문장.
 - 같은 장소를 여러 번 넣지 않는다.
+- special_requests 가 있으면 위 규칙을 지키는 범위에서 반영한다.
 
 아래 JSON Schema 를 따르는 JSON 객체 하나만 출력한다. 설명이나 코드블록 표시는 쓰지 않는다.
 {schema}"""
@@ -45,8 +47,8 @@ class ItineraryGenerationError(Exception):
 
 
 def build_context(request: ItineraryRequest) -> dict:
-    profiles = {p.id: build_profile(p.quiz_selections) for p in request.participants}
-    return {
+    profiles = {p.id: build_profile(p.selections()) for p in request.participants}
+    context = {
         "destination": request.destination,
         "city": request.city,
         "dates": [str(request.start_date + dt.timedelta(days=i)) for i in range(_day_count(request))],
@@ -59,6 +61,10 @@ def build_context(request: ItineraryRequest) -> dict:
             {k: place[k] for k in ("id", "name", "area", "concepts", "durationMin")} for place in load_places(request.city)
         ],
     }
+    # 사용자 자유 입력이라 시스템 프롬프트가 아닌 HumanMessage 데이터로만 전달한다
+    if request.special_requests:
+        context["special_requests"] = request.special_requests
+    return context
 
 
 def build_messages(request: ItineraryRequest) -> list:
@@ -73,12 +79,12 @@ def build_messages(request: ItineraryRequest) -> list:
     return [SystemMessage(system), HumanMessage(human)]
 
 
-def generate_itinerary(request: ItineraryRequest, llm, max_attempts: int = 3) -> ItineraryResponse:
-    """llm: LangChain 채팅 모델 (invoke(messages) -> AIMessage)."""
+async def generate_itinerary(request: ItineraryRequest, llm, max_attempts: int = 3) -> ItineraryResponse:
+    """llm: LangChain 채팅 모델 (ainvoke(messages) -> AIMessage)."""
     messages = build_messages(request)
     error = None
     for _ in range(max_attempts):
-        text = llm.invoke(messages).text  # content 가 문자열이든 블록 리스트든 텍스트만
+        text = (await llm.ainvoke(messages)).text  # content 가 문자열이든 블록 리스트든 텍스트만
         try:
             itinerary = ItineraryResponse.model_validate_json(_strip_code_fence(text))
             _hydrate_and_check(itinerary, request)
@@ -92,13 +98,13 @@ def generate_itinerary(request: ItineraryRequest, llm, max_attempts: int = 3) ->
 def _hydrate_and_check(itinerary: ItineraryResponse, request: ItineraryRequest) -> None:
     """규칙 위반 시 ValueError. 통과하면 장소 이름·좌표를 후보 데이터로 덮어쓴다.
 
-    장소는 그곳에 가는 사람(common 은 전원, alternate 는 pickedBy, separate 는 그룹원)이
+    장소는 그곳에 가는 사람(common 은 전원, alternate 는 picked_by, separate 는 그룹원)이
     모두 고른 컨셉이어야 하고, place.concept 은 그중 하나로 맞춘다.
     """
     catalog = {p["id"]: p for p in load_places(request.city)}
     participant_ids = {p.id for p in request.participants}
     name_of = {p.id: p.name for p in request.participants}
-    liked = {p.id: {c["name"] for c in build_profile(p.quiz_selections)["concepts"]} for p in request.participants}
+    liked = {p.id: {c["name"] for c in build_profile(p.selections())["concepts"]} for p in request.participants}
     expected_dates = [request.start_date + dt.timedelta(days=i) for i in range(_day_count(request))]
     problems = []
 
@@ -120,7 +126,7 @@ def _hydrate_and_check(itinerary: ItineraryResponse, request: ItineraryRequest) 
             elif item.mode == "alternate":
                 visits = [(item.place, item.picked_by)]
                 if not set(item.picked_by) <= participant_ids:
-                    problems.append(f"{item.title}: pickedBy 에 없는 참여자 id 가 있다.")
+                    problems.append(f"{item.title}: picked_by 에 없는 참여자 id 가 있다.")
                     visits = []
             else:
                 visits = [(g.place, g.participant_ids) for g in item.separate]
@@ -175,6 +181,8 @@ if __name__ == "__main__":
         model=os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
         temperature=0.7,
         response_mime_type="application/json",
+        timeout=60,
+        max_retries=2,
     )
-    result = generate_itinerary(req, model)
+    result = asyncio.run(generate_itinerary(req, model))
     print(result.model_dump_json(by_alias=True, exclude_none=True, indent=2))

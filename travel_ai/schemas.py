@@ -1,21 +1,26 @@
 """AI 일정 생성 API 입출력 형식.
 
-JSON 키는 프론트(gdg-frontend) 관례대로 camelCase 로 주고받는다.
+JSON 키는 BE API 와 같은 snake_case 로 주고받는다 (Python 필드명 그대로).
 출력 구조는 gdg-frontend/src/data/mockItinerary.js 와 docs/assets 화면 시안을 기준으로 한다.
 """
 
 import datetime as dt
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-from pydantic.alias_generators import to_camel
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from .quiz import build_profile
 
 
 class _Model(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    """API 입출력 모델의 공통 부모."""
 
 
 # ---------- 입력 ----------
+
+# 입력 모델은 모르는 키를 422로 거부한다. camelCase 키나 오타가 조용히 기본값으로 처리되는 것을 막기 위해서다.
+# (출력 모델은 LLM 출력 검증용이라 forbid 하지 않는다.)
+_FORBID_EXTRA = ConfigDict(extra="forbid")
 
 # 선택지 문자열은 프론트 S05 화면(App.jsx)의 버튼 라벨과 같다.
 Companion = Literal["혼자", "연인", "가족", "친구", "동료"]
@@ -24,14 +29,39 @@ Budget = Literal["50만원 이하", "50만원-100만원", "100만원-200만원",
 Tempo = Literal["여유", "조금 여유", "적당히", "조금 바쁨", "바쁨"]
 
 
+class QuizAnswer(_Model):
+    model_config = _FORBID_EXTRA
+
+    # BE 위키 퀴즈 기준표 v1.0 의 문항·선택지 키 (quiz.QUIZ 참고)
+    question_key: str
+    selected_option_keys: list[str]
+
+
 class Participant(_Model):
+    model_config = _FORBID_EXTRA
+
     id: str
     name: str
-    # 프론트 quizSelections 그대로: {문항 인덱스: [선택지 인덱스, ...]}
-    quiz_selections: dict[int, list[int]]
+    quiz_version: Literal["v1.0"] = "v1.0"
+    answers: list[QuizAnswer]
+
+    @model_validator(mode="after")
+    def _check_answers(self) -> "Participant":
+        keys = [a.question_key for a in self.answers]
+        if len(keys) != len(set(keys)):
+            dup = next(k for k in keys if keys.count(k) > 1)
+            raise ValueError(f"퀴즈 문항 키가 중복되었습니다: {dup}")
+        build_profile(self.selections())  # 모르는 키면 ValueError
+        return self
+
+    def selections(self) -> dict[str, list[str]]:
+        """build_profile 에 넘기는 {문항 키: [선택지 키, ...]} 형태."""
+        return {a.question_key: a.selected_option_keys for a in self.answers}
 
 
 class TripConditions(_Model):
+    model_config = _FORBID_EXTRA
+
     companion: Companion
     transport: Transport
     budget: Budget
@@ -39,11 +69,15 @@ class TripConditions(_Model):
 
 
 class GenerationOptions(_Model):
+    model_config = _FORBID_EXTRA
+
     # 분리 일정이 너무 많아지지 않도록 하루에 둘 수 있는 분리 구간 수
     max_separate_blocks_per_day: int = Field(default=1, ge=0)
 
 
 class ItineraryRequest(_Model):
+    model_config = _FORBID_EXTRA
+
     destination: str = "일본"
     city: str
     start_date: dt.date
@@ -51,11 +85,18 @@ class ItineraryRequest(_Model):
     participants: list[Participant] = Field(min_length=1)
     conditions: TripConditions
     options: GenerationOptions = GenerationOptions()
+    special_requests: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("special_requests")
+    @classmethod
+    def _blank_to_none(cls, v: str | None) -> str | None:
+        # 공백만 보내면 요청이 없는 것으로 본다 (프롬프트에 빈 요청이 들어가지 않게)
+        return v if v and v.strip() else None
 
     @model_validator(mode="after")
     def _check(self) -> "ItineraryRequest":
         if self.end_date < self.start_date:
-            raise ValueError("endDate 는 startDate 이후여야 합니다.")
+            raise ValueError("end_date 는 start_date 이후여야 합니다.")
         ids = [p.id for p in self.participants]
         if len(ids) != len(set(ids)):
             raise ValueError("participants 의 id 가 중복됩니다.")
@@ -107,7 +148,7 @@ class ScheduleItem(_Model):
         elif self.place is None:
             raise ValueError(f"{self.mode} 일정에는 place 가 필요합니다.")
         if self.mode == "alternate" and not self.picked_by:
-            raise ValueError("alternate 일정에는 pickedBy 가 필요합니다.")
+            raise ValueError("alternate 일정에는 picked_by 가 필요합니다.")
         return self
 
 

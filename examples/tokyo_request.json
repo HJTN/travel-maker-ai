@@ -1,10 +1,30 @@
 {
   "city": "도쿄",
-  "startDate": "2026-11-03",
-  "endDate": "2026-11-05",
+  "start_date": "2026-11-03",
+  "end_date": "2026-11-05",
   "participants": [
-    {"id": "me", "name": "진수", "quizSelections": {"0": [3], "1": [1], "2": [0], "3": [2], "4": [1], "5": [1], "6": [1], "7": [3], "8": [1]}},
-    {"id": "friend", "name": "민지", "quizSelections": {"0": [2], "1": [0], "2": [3], "3": [3], "4": [3], "5": [2], "6": [0], "7": [0], "8": [3]}}
+    {"id": "me", "name": "진수", "answers": [
+        {"question_key": "Q_DESTINATION", "selected_option_keys": ["CITY"]},
+        {"question_key": "Q_PLACE", "selected_option_keys": ["HISTORIC_SITE"]},
+        {"question_key": "Q_TIME", "selected_option_keys": ["EXHIBITION"]},
+        {"question_key": "Q_FOOD", "selected_option_keys": ["CAFE_TOUR"]},
+        {"question_key": "Q_EVENING", "selected_option_keys": ["WINE_BAR"]},
+        {"question_key": "Q_ACCOMMODATION", "selected_option_keys": ["HOTEL_RESORT"]},
+        {"question_key": "Q_EXPERIENCE", "selected_option_keys": ["CRAFT_MAKING"]},
+        {"question_key": "Q_FREE_TIME", "selected_option_keys": ["ALLEY_WALK"]},
+        {"question_key": "Q_RELAXATION", "selected_option_keys": ["HOT_SPRING_SPA"]}
+      ]},
+    {"id": "friend", "name": "민지", "answers": [
+        {"question_key": "Q_DESTINATION", "selected_option_keys": ["SEA"]},
+        {"question_key": "Q_PLACE", "selected_option_keys": ["LANDMARK"]},
+        {"question_key": "Q_TIME", "selected_option_keys": ["NIGHT_VIEW"]},
+        {"question_key": "Q_FOOD", "selected_option_keys": ["MARKET_FOOD"]},
+        {"question_key": "Q_EVENING", "selected_option_keys": ["NIGHT_MARKET"]},
+        {"question_key": "Q_ACCOMMODATION", "selected_option_keys": ["GUESTHOUSE"]},
+        {"question_key": "Q_EXPERIENCE", "selected_option_keys": ["LOCAL_FESTIVAL"]},
+        {"question_key": "Q_FREE_TIME", "selected_option_keys": ["SHOPPING"]},
+        {"question_key": "Q_RELAXATION", "selected_option_keys": ["THEME_PARK"]}
+      ]}
   ],
   "conditions": {"companion": "친구", "transport": "대중교통", "budget": "50만원-100만원", "tempo": "적당히"}
 }

@@ -14,27 +14,27 @@
 
 ## ✨ AI 핵심 기능 (Key Feature)
 
-### 1. 사용자 취향 벡터화 & 저장
+### 1. 퀴즈 응답 → 취향 프로필 (일정 생성 내부용)
 
 * **기능 소개**
 
-> 사진 퀴즈 결과(음식, 여행, 문화생활, 여가 활동 등 카테고리별 선호)를 벡터로 바꿔 VectorDB에 저장합니다.<br/>
-> 새로운 경험이나 피드백이 생기면 취향 벡터를 업데이트해 프로필을 최신 상태로 유지합니다.
+> 사진 퀴즈 응답(`quiz_version` v1.0, 문항·선택지 키는 BE 위키 퀴즈 기준표와 동일)을 규칙 기반으로 취향 프로필로 바꿉니다. 일정 생성 안에서만 쓰이며 별도 화면용 API는 없습니다.<br/>
+> 취향 벡터화·VectorDB 저장은 MVP 이후로 미룹니다.
 
 * **처리 흐름**
 
-> 사진 퀴즈 완료 (S03) → 취향 키워드·유형 분류 → 임베딩 → VectorDB (pgvector / Pinecone) 저장 → 취향 분석 결과 (S04)
+> 퀴즈 응답 (`answers`) → 선택지 키 검증 → 컨셉 소분류 취향 프로필
 
 ### 2. 동행자 취향 비교 & 갈등 영역 분석
 
 * **기능 소개**
 
-> 여행 참여자들의 취향 벡터를 비교해 취향 일치도와 공통 관심사를 계산합니다.<br/>
+> 여행 참여자들의 취향 프로필을 비교해 취향 일치도와 공통 관심사를 계산합니다.<br/>
 > 선호도 차이가 큰 항목을 찾아 의견 충돌이 생길 수 있는 영역을 미리 파악합니다.
 
 * **처리 흐름**
 
-> 동행자 전원 퀴즈 완료 (S08) → 참여자 취향 벡터 조회 → 공통 취향 / 차이가 큰 취향 분류
+> 동행자 전원 퀴즈 완료 (S08) → 참여자 취향 프로필 → 공통 취향 / 차이가 큰 취향 분류
 
 ### 3. LangChain 기반 여행 일정 생성
 
@@ -45,7 +45,7 @@
 
 * **처리 흐름**
 
-> 여행지·기간 + 취향 비교 결과 → LangChain 플로우 (장소 탐색 → 일정 배치 → 추천 이유 생성) → Gemini API → 일정 확인 (S10)
+> 여행지·기간 + 취향 비교 결과 (+ 추가 요청사항) → LangChain 플로우 (장소 탐색 → 일정 배치 → 추천 이유 생성) → Gemini API → 일정 확인 (S10)
 
 ---
 
@@ -66,8 +66,7 @@
 | **프레임워크** | LangChain |
 | **프로그래밍 언어** | Python |
 | **LLM** | Google AI Studio (Gemini API) |
-| **VectorDB** | pgvector, Pinecone |
-| 기타 | Oracle Cloud Infrastructure (BE 팀과 공동 사용) |
+| 기타 | Google Cloud Platform (Cloud Run, BE와 공동 사용) |
 
 ---
 
@@ -114,7 +113,7 @@ pip install -r requirements.txt
 
 ### 3. 환경 변수 설정
 
-> Google AI Studio에서 발급한 Gemini API 키와 VectorDB 접속 정보를 `.env`에 넣습니다. `.env`는 커밋하지 않습니다.
+> Google AI Studio에서 발급한 Gemini API 키를 `.env`에 넣습니다. `.env`는 커밋하지 않습니다.
 
 ```shell
 # .env (저장소 루트)
@@ -138,9 +137,49 @@ uvicorn travel_ai.api:app --reload      # http://localhost:8000/docs 에서 요�
 | 메서드 | 경로 | 설명 |
 | :---: | :--- | :--- |
 | `GET` | `/health` | 상태 확인 |
-| `POST` | `/itineraries` | 동행자 전원의 퀴즈 응답 + S05 조건 → 일정 (S10). 요청 예시: `examples/tokyo_request.json` |
+| `POST` | `/itineraries` | 동행자 전원의 퀴즈 응답 + S05 조건 → 일정 (S10) |
 
-`/itineraries` 응답 (실제 Gemini 기준 1회 30~60초):
+AI 서버는 아무것도 저장하지 않습니다(Stateless). 저장은 BE가 맡습니다. JSON 키는 모두 snake_case입니다.
+
+요청 예시 (`examples/tokyo_request.json`):
+
+```json
+{
+  "city": "도쿄",
+  "start_date": "2026-11-03",
+  "end_date": "2026-11-05",
+  "participants": [
+    {"id": "me", "name": "진수", "answers": [
+        {"question_key": "Q_DESTINATION", "selected_option_keys": ["CITY"]},
+        {"question_key": "Q_PLACE", "selected_option_keys": ["HISTORIC_SITE"]},
+        {"question_key": "Q_TIME", "selected_option_keys": ["EXHIBITION"]},
+        {"question_key": "Q_FOOD", "selected_option_keys": ["CAFE_TOUR"]},
+        {"question_key": "Q_EVENING", "selected_option_keys": ["WINE_BAR"]},
+        {"question_key": "Q_ACCOMMODATION", "selected_option_keys": ["HOTEL_RESORT"]},
+        {"question_key": "Q_EXPERIENCE", "selected_option_keys": ["CRAFT_MAKING"]},
+        {"question_key": "Q_FREE_TIME", "selected_option_keys": ["ALLEY_WALK"]},
+        {"question_key": "Q_RELAXATION", "selected_option_keys": ["HOT_SPRING_SPA"]}
+      ]},
+    {"id": "friend", "name": "민지", "answers": [
+        {"question_key": "Q_DESTINATION", "selected_option_keys": ["SEA"]},
+        {"question_key": "Q_PLACE", "selected_option_keys": ["LANDMARK"]},
+        {"question_key": "Q_TIME", "selected_option_keys": ["NIGHT_VIEW"]},
+        {"question_key": "Q_FOOD", "selected_option_keys": ["MARKET_FOOD"]},
+        {"question_key": "Q_EVENING", "selected_option_keys": ["NIGHT_MARKET"]},
+        {"question_key": "Q_ACCOMMODATION", "selected_option_keys": ["GUESTHOUSE"]},
+        {"question_key": "Q_EXPERIENCE", "selected_option_keys": ["LOCAL_FESTIVAL"]},
+        {"question_key": "Q_FREE_TIME", "selected_option_keys": ["SHOPPING"]},
+        {"question_key": "Q_RELAXATION", "selected_option_keys": ["THEME_PARK"]}
+      ]}
+  ],
+  "conditions": {"companion": "친구", "transport": "대중교통", "budget": "50만원-100만원", "tempo": "적당히"}
+}
+```
+
+* `quiz_version`: 선택, 기본값 `"v1.0"`, v1.0만 허용(다른 값은 422). 알 수 없는 `question_key`·`selected_option_keys`나 중복된 `question_key`는 422입니다.
+* `special_requests`: 선택, 최대 1000자 문자열. 일정 생성 프롬프트에 반영됩니다.
+
+`/itineraries` 응답 (LLM 1회 호출 30~60초(호출당 60초 제한), 규칙 위반 시 최대 3회 시도, 서버 전체 상한 170초 → 초과 시 503 `LLM_UNAVAILABLE`. BE 타임아웃 권장 180초(서버 상한보다 크게). 배포 후 재측정 필요):
 
 | 상태 | `code` | `retryable` | 의미 → 화면 |
 | :---: | :--- | :---: | :--- |
@@ -153,10 +192,63 @@ uvicorn travel_ai.api:app --reload      # http://localhost:8000/docs 에서 요�
 
 ---
 
+## ☁️ 배포 (GCP Cloud Run)
+
+AI 서버는 BE만 호출하는 서버 간 API라서 **비공개** Cloud Run 서비스로 배포합니다. 리전은 `asia-northeast3`, 요청 타임아웃은 300초입니다 (`/itineraries`가 30~60초 걸림). 서비스 URL은 README에 적지 않고 BE에 따로 전달합니다.
+
+### 1. GCP 준비 (소유자 계정, 1회)
+
+`GOOGLE_API_KEY`는 이미지에 넣지 않고 Secret Manager(`gemini-api-key`)로 주입합니다.
+
+```shell
+gcloud config set project <PROJECT_ID>
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com
+read -rs GOOGLE_API_KEY && printf '%s' "$GOOGLE_API_KEY" | gcloud secrets create gemini-api-key --data-file=-
+```
+
+### 2. 배포
+
+```shell
+gcloud run deploy travel-maker-ai --source . --region asia-northeast3 \
+  --no-allow-unauthenticated --timeout 300 --memory 512Mi \
+  --set-secrets GOOGLE_API_KEY=gemini-api-key:latest
+```
+
+빌드 권한 오류가 나면 메시지에 나온 서비스 계정에 `roles/run.builder`, 실행 계정에 `roles/secretmanager.secretAccessor`를 줍니다.
+
+### 3. 동작 확인
+
+```shell
+curl -s -H "Authorization: Bearer $(gcloud auth print-identity-token)" <SERVICE_URL>/health
+# {"status":"ok"}  (토큰 없이 호출하면 403)
+```
+
+### 4. BE 호출 권한
+
+BE 서비스 계정 이메일을 받아 호출 권한(`roles/run.invoker`)을 줍니다. 이 계정만 호출할 수 있습니다.
+
+```shell
+gcloud run services add-iam-policy-binding travel-maker-ai --region asia-northeast3 \
+  --member="serviceAccount:<BE_SA_EMAIL>" \
+  --role="roles/run.invoker"
+```
+
+BE는 요청마다 **ID 토큰(audience = 서비스 URL)** 을 `Authorization: Bearer <토큰>` 헤더에 붙여 호출합니다.
+
+### 로컬 이미지 확인
+
+```shell
+docker build -t travel-maker-ai .
+docker run --rm -d -p 8080:8080 --env-file .env --name tm-ai travel-maker-ai
+curl -s localhost:8080/health   # {"status":"ok"}
+docker stop tm-ai
+```
+
+---
+
 ## 📋 파이프라인 구성
 
 | 호출 시점 | 처리 단계 | 주요 기능 |
 | :--- | :---: | :--- |
-| `S03 사진 퀴즈 완료` | 취향 벡터화 | 퀴즈 결과를 벡터로 바꿔 VectorDB에 저장 |
 | `S08 동행자 전원 퀴즈 완료` | AI 일정 생성 | 취향 비교 → 공통·분리·번갈아 일정 생성 |
 | `S09 재시도` / `S10 재생성` | AI 일정 재생성 | 생성에 실패했거나 사용자가 다시 요청하면 일정을 다시 생성 |

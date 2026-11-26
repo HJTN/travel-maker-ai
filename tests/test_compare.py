@@ -4,8 +4,8 @@ from travel_ai.compare import compare_profiles
 from travel_ai.quiz import build_profile
 
 # 나: 산(트레킹), 카페 투어, 온천 / 동행자: 카페 투어, 쇼핑, 온천
-ME = build_profile({"0": [0], "3": [2], "8": [1]})
-FRIEND = build_profile({"3": [2], "7": [0], "8": [1]})
+ME = build_profile({"Q_DESTINATION": ["MOUNTAIN"], "Q_FOOD": ["CAFE_TOUR"], "Q_RELAXATION": ["HOT_SPRING_SPA"]})
+FRIEND = build_profile({"Q_FOOD": ["CAFE_TOUR"], "Q_FREE_TIME": ["SHOPPING"], "Q_RELAXATION": ["HOT_SPRING_SPA"]})
 
 
 def test_common_and_different():
@@ -27,16 +27,16 @@ def test_different_group_is_separate():
 
 def test_same_category_different_group_is_separate():
     # 둘 다 미식이지만 카페·디저트 vs 길거리 음식·시장 -> 중분류가 달라 분리
-    cafe = build_profile({"3": [2]})
-    market = build_profile({"3": [3]})
+    cafe = build_profile({"Q_FOOD": ["CAFE_TOUR"]})
+    market = build_profile({"Q_FOOD": ["MARKET_FOOD"]})
     result = compare_profiles({"a": cafe, "b": market})
     assert {c["name"]: c["mode"] for c in result["different"]} == {"카페 투어": "separate", "시장 먹거리": "separate"}
 
 
 def test_same_group_different_concept_is_alternate():
     # 둘 다 역사·문화 유적이지만 유적지 vs 전시 -> 번갈아
-    heritage = build_profile({"1": [1]})
-    exhibition = build_profile({"2": [0]})
+    heritage = build_profile({"Q_PLACE": ["HISTORIC_SITE"]})
+    exhibition = build_profile({"Q_TIME": ["EXHIBITION"]})
     result = compare_profiles({"a": heritage, "b": exhibition})
     assert result["different"][0]["group"] == "역사·문화 유적"
     assert {c["name"]: c["mode"] for c in result["different"]} == {"유적지": "alternate", "전시": "alternate"}
@@ -44,9 +44,9 @@ def test_same_group_different_concept_is_alternate():
 
 def test_separate_if_any_non_picker_lacks_group():
     # c는 역사·문화 유적을 안 고름 -> b가 전시를 골랐어도 유적지는 분리
-    heritage = build_profile({"1": [1]})
-    exhibition = build_profile({"2": [0]})
-    landmark = build_profile({"1": [0]})
+    heritage = build_profile({"Q_PLACE": ["HISTORIC_SITE"]})
+    exhibition = build_profile({"Q_TIME": ["EXHIBITION"]})
+    landmark = build_profile({"Q_PLACE": ["LANDMARK"]})
     result = compare_profiles({"a": heritage, "b": exhibition, "c": landmark})
     assert {c["name"]: c["mode"] for c in result["different"]}["유적지"] == "separate"
 
@@ -72,7 +72,7 @@ def test_category_gaps_sorted_desc():
 
 
 def test_three_people_common_requires_everyone():
-    third = build_profile({"3": [2]})
+    third = build_profile({"Q_FOOD": ["CAFE_TOUR"]})
     result = compare_profiles({"me": ME, "friend": FRIEND, "third": third})
 
     assert [c["name"] for c in result["common"]] == ["카페 투어"]
