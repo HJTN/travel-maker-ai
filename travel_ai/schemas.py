@@ -1,18 +1,17 @@
 """AI 일정 생성 API 입출력 형식.
 
-JSON 키는 프론트(gdg-frontend) 관례대로 camelCase 로 주고받는다.
+JSON 키는 BE API 와 같은 snake_case 로 주고받는다 (Python 필드명 그대로).
 출력 구조는 gdg-frontend/src/data/mockItinerary.js 와 docs/assets 화면 시안을 기준으로 한다.
 """
 
 import datetime as dt
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-from pydantic.alias_generators import to_camel
+from pydantic import BaseModel, Field, model_validator
 
 
 class _Model(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    """API 입출력 모델의 공통 부모."""
 
 
 # ---------- 입력 ----------
@@ -27,7 +26,7 @@ Tempo = Literal["여유", "조금 여유", "적당히", "조금 바쁨", "바쁨
 class Participant(_Model):
     id: str
     name: str
-    # 프론트 quizSelections 그대로: {문항 인덱스: [선택지 인덱스, ...]}
+    # 프론트 퀴즈 답안 그대로: {문항 인덱스: [선택지 인덱스, ...]}
     quiz_selections: dict[int, list[int]]
 
 
@@ -55,7 +54,7 @@ class ItineraryRequest(_Model):
     @model_validator(mode="after")
     def _check(self) -> "ItineraryRequest":
         if self.end_date < self.start_date:
-            raise ValueError("endDate 는 startDate 이후여야 합니다.")
+            raise ValueError("end_date 는 start_date 이후여야 합니다.")
         ids = [p.id for p in self.participants]
         if len(ids) != len(set(ids)):
             raise ValueError("participants 의 id 가 중복됩니다.")
@@ -107,7 +106,7 @@ class ScheduleItem(_Model):
         elif self.place is None:
             raise ValueError(f"{self.mode} 일정에는 place 가 필요합니다.")
         if self.mode == "alternate" and not self.picked_by:
-            raise ValueError("alternate 일정에는 pickedBy 가 필요합니다.")
+            raise ValueError("alternate 일정에는 picked_by 가 필요합니다.")
         return self
 
 

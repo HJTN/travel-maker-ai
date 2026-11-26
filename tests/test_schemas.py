@@ -5,11 +5,11 @@ from travel_ai.schemas import ItineraryRequest, ItineraryResponse, ScheduleItem
 
 REQUEST = {
     "city": "도쿄",
-    "startDate": "2026-11-03",
-    "endDate": "2026-11-05",
+    "start_date": "2026-11-03",
+    "end_date": "2026-11-05",
     "participants": [
-        {"id": "me", "name": "나", "quizSelections": {"0": [0], "3": [2]}},
-        {"id": "friend", "name": "동행자 1", "quizSelections": {"3": [2], "7": [0]}},
+        {"id": "me", "name": "나", "quiz_selections": {"0": [0], "3": [2]}},
+        {"id": "friend", "name": "동행자 1", "quiz_selections": {"3": [2], "7": [0]}},
     ],
     "conditions": {"companion": "친구", "transport": "대중교통", "budget": "50만원-100만원", "tempo": "적당히"},
 }
@@ -29,16 +29,16 @@ RESPONSE = {
             "title": "도쿄 대표 명소 여행",
             "schedule": [
                 {
-                    "time": "10:00", "endTime": "11:30", "title": "센소지 방문", "mode": "alternate",
-                    "place": SENSOJI, "pickedBy": ["me"],
+                    "time": "10:00", "end_time": "11:30", "title": "센소지 방문", "mode": "alternate",
+                    "place": SENSOJI, "picked_by": ["me"],
                     "description": "도쿄에서 가장 오래된 사찰", "reason": "나의 유적지 취향, 동행자도 관광 선호",
                 },
                 {
-                    "time": "14:00", "endTime": "16:00", "title": "각자 즐기는 오후", "mode": "separate",
+                    "time": "14:00", "end_time": "16:00", "title": "각자 즐기는 오후", "mode": "separate",
                     "separate": [
-                        {"participantIds": ["friend"], "title": "갓파바시", "place": KAPPABASHI,
+                        {"participant_ids": ["friend"], "title": "갓파바시", "place": KAPPABASHI,
                          "description": "조리도구와 식기점", "reason": "동행자의 쇼핑 취향"},
-                        {"participantIds": ["me"], "title": "스미다 공원", "place": SUMIDA,
+                        {"participant_ids": ["me"], "title": "스미다 공원", "place": SUMIDA,
                          "description": "스미다강 산책", "reason": "나의 자연 경관 취향"},
                     ],
                 },
@@ -48,12 +48,19 @@ RESPONSE = {
 }
 
 
-def test_request_parses_camel_case_and_defaults():
+def test_request_parses_snake_case_and_defaults():
     req = ItineraryRequest.model_validate(REQUEST)
 
     assert req.destination == "일본"
     assert req.participants[0].quiz_selections == {0: [0], 3: [2]}
     assert req.options.max_separate_blocks_per_day == 1
+
+
+def test_request_rejects_camel_case():
+    camel = {**REQUEST, "startDate": REQUEST["start_date"], "endDate": REQUEST["end_date"]}
+    del camel["start_date"], camel["end_date"]
+    with pytest.raises(ValidationError):
+        ItineraryRequest.model_validate(camel)
 
 
 def test_request_rejects_unknown_condition_value():
@@ -64,23 +71,22 @@ def test_request_rejects_unknown_condition_value():
 
 def test_request_rejects_reversed_dates_and_duplicate_ids():
     with pytest.raises(ValidationError):
-        ItineraryRequest.model_validate({**REQUEST, "endDate": "2026-11-01"})
+        ItineraryRequest.model_validate({**REQUEST, "end_date": "2026-11-01"})
     with pytest.raises(ValidationError):
         ItineraryRequest.model_validate({**REQUEST, "participants": [REQUEST["participants"][0]] * 2})
 
 
-def test_response_round_trips_as_camel_case():
+def test_response_round_trips_as_snake_case():
     resp = ItineraryResponse.model_validate(RESPONSE)
-    dumped = resp.model_dump(mode="json", by_alias=True, exclude_none=True)
 
-    assert dumped == RESPONSE
+    assert resp.model_dump(mode="json", exclude_none=True) == RESPONSE
 
 
 def test_schedule_item_mode_rules():
-    base = {"time": "10:00", "endTime": "11:00", "title": "x"}
+    base = {"time": "10:00", "end_time": "11:00", "title": "x"}
     with pytest.raises(ValidationError, match="place"):
         ScheduleItem.model_validate({**base, "mode": "common"})
-    with pytest.raises(ValidationError, match="pickedBy"):
+    with pytest.raises(ValidationError, match="picked_by"):
         ScheduleItem.model_validate({**base, "mode": "alternate", "place": SENSOJI})
     with pytest.raises(ValidationError, match="2개 이상"):
         ScheduleItem.model_validate({**base, "mode": "separate", "separate": []})

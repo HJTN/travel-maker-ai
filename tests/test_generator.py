@@ -10,11 +10,11 @@ from travel_ai.schemas import ItineraryRequest
 
 REQUEST = ItineraryRequest.model_validate({
     "city": "도쿄",
-    "startDate": "2026-11-03",
-    "endDate": "2026-11-03",
+    "start_date": "2026-11-03",
+    "end_date": "2026-11-03",
     "participants": [
-        {"id": "me", "name": "진수", "quizSelections": {"1": [1], "3": [2], "8": [1]}},
-        {"id": "friend", "name": "민지", "quizSelections": {"2": [0], "3": [2], "7": [0]}},
+        {"id": "me", "name": "진수", "quiz_selections": {"1": [1], "3": [2], "8": [1]}},
+        {"id": "friend", "name": "민지", "quiz_selections": {"2": [0], "3": [2], "7": [0]}},
     ],
     "conditions": {"companion": "친구", "transport": "대중교통", "budget": "50만원-100만원", "tempo": "여유"},
 })
@@ -30,13 +30,13 @@ GOOD = {
     "days": [{
         "day": 1, "date": "2026-11-03", "title": "아사쿠사·우에노",
         "schedule": [
-            {"time": "10:00", "endTime": "11:30", "title": "센소지", "mode": "alternate",
-             "place": place("sensoji", "유적지"), "pickedBy": ["me"], "description": "d", "reason": "r"},
-            {"time": "12:00", "endTime": "13:30", "title": "도쿄 국립박물관", "mode": "alternate",
-             "place": place("tokyo-national-museum", "전시"), "pickedBy": ["friend"], "description": "d", "reason": "r"},
-            {"time": "14:00", "endTime": "16:00", "title": "각자", "mode": "separate", "separate": [
-                {"participantIds": ["me"], "title": "스파", "place": place("spa-laqua", "온천·스파"), "description": "d", "reason": "r"},
-                {"participantIds": ["friend"], "title": "쇼핑", "place": place("ameyoko", "쇼핑 유형"), "description": "d", "reason": "r"},
+            {"time": "10:00", "end_time": "11:30", "title": "센소지", "mode": "alternate",
+             "place": place("sensoji", "유적지"), "picked_by": ["me"], "description": "d", "reason": "r"},
+            {"time": "12:00", "end_time": "13:30", "title": "도쿄 국립박물관", "mode": "alternate",
+             "place": place("tokyo-national-museum", "전시"), "picked_by": ["friend"], "description": "d", "reason": "r"},
+            {"time": "14:00", "end_time": "16:00", "title": "각자", "mode": "separate", "separate": [
+                {"participant_ids": ["me"], "title": "스파", "place": place("spa-laqua", "온천·스파"), "description": "d", "reason": "r"},
+                {"participant_ids": ["friend"], "title": "쇼핑", "place": place("ameyoko", "쇼핑 유형"), "description": "d", "reason": "r"},
             ]},
         ],
     }],
@@ -104,17 +104,17 @@ def test_retries_with_error_feedback_then_succeeds():
 @pytest.mark.parametrize("mutate, message", [
     (lambda d: d["days"][0]["schedule"][0]["place"].update(id="made-up"), "후보 목록에 없는"),
     (lambda d: d["days"][0].update(date="2026-11-04"), "date"),
-    (lambda d: d["days"][0]["schedule"][2]["separate"][0].update(participantIds=["friend"]), "정확히 한 번씩"),
-    (lambda d: d["days"][0]["schedule"].append(copy.deepcopy(d["days"][0]["schedule"][2]) | {"time": "17:00", "endTime": "18:00"}), "separate 항목이 2개"),
+    (lambda d: d["days"][0]["schedule"][2]["separate"][0].update(participant_ids=["friend"]), "정확히 한 번씩"),
+    (lambda d: d["days"][0]["schedule"].append(copy.deepcopy(d["days"][0]["schedule"][2]) | {"time": "17:00", "end_time": "18:00"}), "separate 항목이 2개"),
     (lambda d: d["days"][0]["schedule"][1].update(time="09:00"), "오름차순"),
-    (lambda d: d["days"][0]["schedule"][0].update(pickedBy=["ghost"]), "pickedBy"),
+    (lambda d: d["days"][0]["schedule"][0].update(picked_by=["ghost"]), "picked_by"),
     # 공통 컨셉(카페 투어)이 아닌 장소를 common 으로
-    (lambda d: d["days"][0]["schedule"][0].update(mode="common", pickedBy=None), "모두가 고른 컨셉"),
+    (lambda d: d["days"][0]["schedule"][0].update(mode="common", picked_by=None), "모두가 고른 컨셉"),
     # 센소지(유적지·대표 명소)는 민지 취향이 아니다
-    (lambda d: d["days"][0]["schedule"][0].update(pickedBy=["friend"]), "민지"),
+    (lambda d: d["days"][0]["schedule"][0].update(picked_by=["friend"]), "민지"),
     # 분리 그룹에 맞지 않는 장소
-    (lambda d: d["days"][0]["schedule"][2]["separate"][0].update(participantIds=["friend"]) or
-               d["days"][0]["schedule"][2]["separate"][1].update(participantIds=["me"]), "취향이 아니다"),
+    (lambda d: d["days"][0]["schedule"][2]["separate"][0].update(participant_ids=["friend"]) or
+               d["days"][0]["schedule"][2]["separate"][1].update(participant_ids=["me"]), "취향이 아니다"),
 ])
 def test_rule_violations_fail_after_retries(mutate, message):
     bad = copy.deepcopy(GOOD)

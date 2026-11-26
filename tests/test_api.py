@@ -32,13 +32,13 @@ def test_health(client):
     assert client.get("/health").json() == {"status": "ok"}
 
 
-def test_creates_itinerary_in_camel_case(client):
+def test_creates_itinerary_in_snake_case(client):
     use(fake(GOOD))
     res = client.post("/itineraries", json=BODY)
 
     assert res.status_code == 200
     first = res.json()["days"][0]["schedule"][0]
-    assert first["pickedBy"] == ["me"] and first["endTime"] == "11:30"
+    assert first["picked_by"] == ["me"] and first["end_time"] == "11:30"
     assert first["place"]["name"] == "센소지"  # 후보 데이터로 덮어쓴 값
     assert "separate" not in first  # null 필드는 빼고 보낸다
 
