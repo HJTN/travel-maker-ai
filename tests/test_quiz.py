@@ -44,3 +44,8 @@ def test_build_profile_empty():
 def test_build_profile_rejects_unknown_key():
     with pytest.raises(ValueError, match="Q_DESTINATION / VOLCANO"):
         build_profile({"Q_DESTINATION": ["VOLCANO"]})
+
+
+def test_build_profile_rejects_unknown_question_with_empty_options():
+    with pytest.raises(ValueError, match="Q_BOGUS"):
+        build_profile({"Q_BOGUS": []})

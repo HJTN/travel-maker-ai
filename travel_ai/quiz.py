@@ -61,6 +61,8 @@ def build_profile(selections: dict[str, list[str]]) -> dict:
     lodging: list[str] = []
 
     for question_key, option_keys in selections.items():
+        if question_key not in QUIZ:  # 선택지가 비어 있어도 문항 키는 검사한다
+            raise ValueError(f"알 수 없는 퀴즈 키: {question_key}")
         for option_key in dict.fromkeys(option_keys):
             try:
                 label, concept = QUIZ[question_key][option_key]

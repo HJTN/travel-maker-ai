@@ -79,3 +79,13 @@ def test_unknown_quiz_key_is_422(client):
 
     assert res.status_code == 422
     assert "SCENIC_PHOTO" in res.text
+
+
+def test_unknown_question_key_with_empty_options_is_422(client):
+    use(fake(GOOD))
+    bad = copy.deepcopy(BODY)
+    bad["participants"][0]["answers"].append({"question_key": "Q_BOGUS", "selected_option_keys": []})
+    res = client.post("/itineraries", json=bad)
+
+    assert res.status_code == 422
+    assert "Q_BOGUS" in res.text
