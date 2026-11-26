@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import json
 
@@ -63,7 +64,7 @@ def test_prompt_reflects_conditions():
 
 
 def test_generate_hydrates_places_from_catalog():
-    result = generate_itinerary(REQUEST, fake(GOOD))
+    result = asyncio.run(generate_itinerary(REQUEST, fake(GOOD)))
     sensoji = result.days[0].schedule[0].place
 
     assert (sensoji.name, sensoji.lat, sensoji.lng) == ("센소지", 35.7148, 139.7967)
@@ -72,23 +73,23 @@ def test_generate_hydrates_places_from_catalog():
 def test_concept_is_fixed_to_one_the_people_picked():
     reply = copy.deepcopy(GOOD)
     reply["days"][0]["schedule"][1]["place"]["concept"] = "유적지"  # 박물관은 유적지이기도 하지만 민지는 '전시'를 골랐다
-    museum = generate_itinerary(REQUEST, fake(reply)).days[0].schedule[1].place
+    museum = asyncio.run(generate_itinerary(REQUEST, fake(reply))).days[0].schedule[1].place
 
     assert museum.concept == "전시"
 
 
 def test_strips_code_fence():
     reply = "```json\n" + json.dumps(GOOD, ensure_ascii=False) + "\n```"
-    assert generate_itinerary(REQUEST, fake(reply)).city == "도쿄"
+    assert asyncio.run(generate_itinerary(REQUEST, fake(reply))).city == "도쿄"
 
 
 def test_accepts_content_block_list():
     # Gemini 3.x 는 content 를 [{"type": "text", "text": ...}] 블록 리스트로 돌려준다
     class BlockLLM:
-        def invoke(self, messages):
+        async def ainvoke(self, messages):
             return AIMessage(content=[{"type": "text", "text": json.dumps(GOOD, ensure_ascii=False)}])
 
-    assert generate_itinerary(REQUEST, BlockLLM()).city == "도쿄"
+    assert asyncio.run(generate_itinerary(REQUEST, BlockLLM())).city == "도쿄"
 
 
 def test_retries_with_error_feedback_then_succeeds():
@@ -96,7 +97,7 @@ def test_retries_with_error_feedback_then_succeeds():
     bad["days"][0]["schedule"][0]["place"]["id"] = "made-up-place"
     llm = fake(bad, GOOD)
 
-    result = generate_itinerary(REQUEST, llm)
+    result = asyncio.run(generate_itinerary(REQUEST, llm))
 
     assert result.days[0].schedule[0].place.id == "sensoji"
 
@@ -120,12 +121,12 @@ def test_rule_violations_fail_after_retries(mutate, message):
     bad = copy.deepcopy(GOOD)
     mutate(bad)
     with pytest.raises(ItineraryGenerationError, match=message):
-        generate_itinerary(REQUEST, fake(bad, bad), max_attempts=2)
+        asyncio.run(generate_itinerary(REQUEST, fake(bad, bad), max_attempts=2))
 
 
 def test_invalid_json_fails():
     with pytest.raises(ItineraryGenerationError):
-        generate_itinerary(REQUEST, fake("not json"), max_attempts=1)
+        asyncio.run(generate_itinerary(REQUEST, fake("not json"), max_attempts=1))
 
 
 def test_context_with_participant_without_concepts():

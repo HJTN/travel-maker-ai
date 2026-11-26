@@ -15,7 +15,7 @@ class Raising:
     def __init__(self, error):
         self.error = error
 
-    def invoke(self, messages):
+    async def ainvoke(self, messages):
         raise self.error
 
 

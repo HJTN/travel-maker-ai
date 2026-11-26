@@ -50,12 +50,11 @@ def health() -> dict:
     response_model_exclude_none=True,
     responses={400: {"model": ErrorResponse}, 502: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
 )
-def create_itinerary(request: ItineraryRequest, llm=Depends(get_llm)):
-    # 동기 함수라 FastAPI 가 스레드풀에서 돌린다 (LLM 호출이 블로킹이므로)
+async def create_itinerary(request: ItineraryRequest, llm=Depends(get_llm)):
     if request.city not in CITY_FILES:
         return _error(400, "UNSUPPORTED_CITY", f"지원하지 않는 도시입니다: {request.city} (지원: {', '.join(CITY_FILES)})", False)
     try:
-        return generate_itinerary(request, llm)
+        return await generate_itinerary(request, llm)
     except ItineraryGenerationError as e:
         # LLM 이 재시도 후에도 규칙에 맞는 일정을 못 만듦. 다시 생성하면 될 수 있다.
         return _error(502, "GENERATION_FAILED", f"일정을 만들지 못했습니다: {e}", True)

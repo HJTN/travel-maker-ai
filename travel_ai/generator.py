@@ -4,6 +4,7 @@
 LLM 은 장소를 후보 id 로만 고르고, 이름·좌표는 후보 데이터로 덮어쓴다.
 """
 
+import asyncio
 import datetime as dt
 import json
 
@@ -78,12 +79,12 @@ def build_messages(request: ItineraryRequest) -> list:
     return [SystemMessage(system), HumanMessage(human)]
 
 
-def generate_itinerary(request: ItineraryRequest, llm, max_attempts: int = 3) -> ItineraryResponse:
-    """llm: LangChain 채팅 모델 (invoke(messages) -> AIMessage)."""
+async def generate_itinerary(request: ItineraryRequest, llm, max_attempts: int = 3) -> ItineraryResponse:
+    """llm: LangChain 채팅 모델 (ainvoke(messages) -> AIMessage)."""
     messages = build_messages(request)
     error = None
     for _ in range(max_attempts):
-        text = llm.invoke(messages).text  # content 가 문자열이든 블록 리스트든 텍스트만
+        text = (await llm.ainvoke(messages)).text  # content 가 문자열이든 블록 리스트든 텍스트만
         try:
             itinerary = ItineraryResponse.model_validate_json(_strip_code_fence(text))
             _hydrate_and_check(itinerary, request)
@@ -181,5 +182,5 @@ if __name__ == "__main__":
         temperature=0.7,
         response_mime_type="application/json",
     )
-    result = generate_itinerary(req, model)
+    result = asyncio.run(generate_itinerary(req, model))
     print(result.model_dump_json(by_alias=True, exclude_none=True, indent=2))
