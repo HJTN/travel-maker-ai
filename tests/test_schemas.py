@@ -1,15 +1,15 @@
 import pytest
 from pydantic import ValidationError
 
-from travel_ai.schemas import ItineraryRequest, ItineraryResponse, ScheduleItem
+from travel_ai.schemas import ItineraryRequest, ItineraryResponse, Participant, ScheduleItem
 
 REQUEST = {
     "city": "도쿄",
     "start_date": "2026-11-03",
     "end_date": "2026-11-05",
     "participants": [
-        {"id": "me", "name": "나", "quiz_selections": {"0": [0], "3": [2]}},
-        {"id": "friend", "name": "동행자 1", "quiz_selections": {"3": [2], "7": [0]}},
+        {"id": "me", "name": "나", "answers": [{"question_key": "Q_DESTINATION", "selected_option_keys": ["MOUNTAIN"]}, {"question_key": "Q_FOOD", "selected_option_keys": ["CAFE_TOUR"]}]},
+        {"id": "friend", "name": "동행자 1", "answers": [{"question_key": "Q_FOOD", "selected_option_keys": ["CAFE_TOUR"]}, {"question_key": "Q_FREE_TIME", "selected_option_keys": ["SHOPPING"]}]},
     ],
     "conditions": {"companion": "친구", "transport": "대중교통", "budget": "50만원-100만원", "tempo": "적당히"},
 }
@@ -52,7 +52,7 @@ def test_request_parses_snake_case_and_defaults():
     req = ItineraryRequest.model_validate(REQUEST)
 
     assert req.destination == "일본"
-    assert req.participants[0].quiz_selections == {0: [0], 3: [2]}
+    assert req.participants[0].selections() == {"Q_DESTINATION": ["MOUNTAIN"], "Q_FOOD": ["CAFE_TOUR"]}
     assert req.options.max_separate_blocks_per_day == 1
 
 
@@ -92,3 +92,17 @@ def test_schedule_item_mode_rules():
         ScheduleItem.model_validate({**base, "mode": "separate", "separate": []})
     with pytest.raises(ValidationError):
         ScheduleItem.model_validate({**base, "time": "9:00", "mode": "common", "place": SENSOJI})
+
+
+def test_participant_answers_to_selections():
+    p = Participant.model_validate({"id": "me", "name": "나", "answers": [
+        {"question_key": "Q_FOOD", "selected_option_keys": ["CAFE_TOUR"]},
+        {"question_key": "Q_TIME", "selected_option_keys": []}]})
+    assert p.quiz_version == "v1.0"
+    assert p.selections() == {"Q_FOOD": ["CAFE_TOUR"], "Q_TIME": []}
+
+
+def test_participant_rejects_duplicate_question_key():
+    answer = {"question_key": "Q_FOOD", "selected_option_keys": ["CAFE_TOUR"]}
+    with pytest.raises(ValidationError):
+        Participant.model_validate({"id": "me", "name": "나", "answers": [answer, answer]})

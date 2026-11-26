@@ -15,22 +15,24 @@ def test_taxonomy_matches_xlsx():
     assert rows == CONCEPTS
 
 
-def test_quiz_shape_and_concepts_exist():
-    assert len(QUIZ) == 9
-    for question in QUIZ:
-        assert len(question) == 4
-        for _, concept in question:
-            assert concept is None or concept in CONCEPTS
+def test_quiz_keys_match_be_spec():
+    assert list(QUIZ) == ["Q_DESTINATION", "Q_PLACE", "Q_TIME", "Q_FOOD", "Q_EVENING",
+                          "Q_ACCOMMODATION", "Q_EXPERIENCE", "Q_FREE_TIME", "Q_RELAXATION"]
+    assert all(len(options) == 4 for options in QUIZ.values())
+    assert all(c is None or c in CONCEPTS for options in QUIZ.values() for _, c in options.values())
 
 
 def test_build_profile_counts_and_ratios():
-    # 프론트에서 JSON 으로 넘어오면 키가 문자열이다.
-    profile = build_profile({"0": [0], "2": [1, 3], "3": [2], "5": [1]})
+    profile = build_profile({"Q_DESTINATION": ["MOUNTAIN"], "Q_TIME": ["TREKKING", "NIGHT_VIEW"],
+                             "Q_FOOD": ["CAFE_TOUR"], "Q_ACCOMMODATION": ["HOTEL_RESORT"]})
 
     assert profile["concepts"][0] == {"name": "트레킹·등산", "category": "관광", "group": "자연 경관", "count": 2}
-    assert {c["name"] for c in profile["concepts"]} == {"트레킹·등산", "대표 명소", "카페 투어"}
     assert profile["categories"] == {"관광": 0.75, "미식": 0.25, "휴식": 0.0, "체험": 0.0}
     assert profile["lodging"] == ["호텔·리조트"]
+
+
+def test_build_profile_ignores_duplicate_option():
+    assert build_profile({"Q_FOOD": ["CAFE_TOUR", "CAFE_TOUR"]})["concepts"][0]["count"] == 1
 
 
 def test_build_profile_empty():
@@ -39,6 +41,6 @@ def test_build_profile_empty():
     assert sum(profile["categories"].values()) == 0
 
 
-def test_build_profile_rejects_unknown_option():
-    with pytest.raises(IndexError):
-        build_profile({"0": [4]})
+def test_build_profile_rejects_unknown_key():
+    with pytest.raises(ValueError, match="Q_DESTINATION / VOLCANO"):
+        build_profile({"Q_DESTINATION": ["VOLCANO"]})

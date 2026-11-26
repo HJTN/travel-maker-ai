@@ -9,6 +9,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from .quiz import build_profile
+
 
 class _Model(BaseModel):
     """API 입출력 모델의 공통 부모."""
@@ -23,11 +25,29 @@ Budget = Literal["50만원 이하", "50만원-100만원", "100만원-200만원",
 Tempo = Literal["여유", "조금 여유", "적당히", "조금 바쁨", "바쁨"]
 
 
+class QuizAnswer(_Model):
+    # BE 위키 퀴즈 기준표 v1.0 의 문항·선택지 키 (quiz.QUIZ 참고)
+    question_key: str
+    selected_option_keys: list[str]
+
+
 class Participant(_Model):
     id: str
     name: str
-    # 프론트 퀴즈 답안 그대로: {문항 인덱스: [선택지 인덱스, ...]}
-    quiz_selections: dict[int, list[int]]
+    quiz_version: Literal["v1.0"] = "v1.0"
+    answers: list[QuizAnswer]
+
+    @model_validator(mode="after")
+    def _check_answers(self) -> "Participant":
+        keys = [a.question_key for a in self.answers]
+        if len(keys) != len(set(keys)):
+            raise ValueError("퀴즈 문항 키가 중복되었습니다")
+        build_profile(self.selections())  # 모르는 키면 ValueError
+        return self
+
+    def selections(self) -> dict[str, list[str]]:
+        """build_profile 에 넘기는 {문항 키: [선택지 키, ...]} 형태."""
+        return {a.question_key: a.selected_option_keys for a in self.answers}
 
 
 class TripConditions(_Model):

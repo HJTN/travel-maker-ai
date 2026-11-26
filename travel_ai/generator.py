@@ -45,7 +45,7 @@ class ItineraryGenerationError(Exception):
 
 
 def build_context(request: ItineraryRequest) -> dict:
-    profiles = {p.id: build_profile(p.quiz_selections) for p in request.participants}
+    profiles = {p.id: build_profile(p.selections()) for p in request.participants}
     return {
         "destination": request.destination,
         "city": request.city,
@@ -98,7 +98,7 @@ def _hydrate_and_check(itinerary: ItineraryResponse, request: ItineraryRequest) 
     catalog = {p["id"]: p for p in load_places(request.city)}
     participant_ids = {p.id for p in request.participants}
     name_of = {p.id: p.name for p in request.participants}
-    liked = {p.id: {c["name"] for c in build_profile(p.quiz_selections)["concepts"]} for p in request.participants}
+    liked = {p.id: {c["name"] for c in build_profile(p.selections())["concepts"]} for p in request.participants}
     expected_dates = [request.start_date + dt.timedelta(days=i) for i in range(_day_count(request))]
     problems = []
 

@@ -1,3 +1,4 @@
+import copy
 import json
 
 import pytest
@@ -68,3 +69,13 @@ def test_unsupported_city(client):
 
     assert res.status_code == 400
     assert res.json() | {"message": ""} == {"code": "UNSUPPORTED_CITY", "message": "", "retryable": False}
+
+
+def test_unknown_quiz_key_is_422(client):
+    use(fake(GOOD))
+    bad = copy.deepcopy(BODY)
+    bad["participants"][0]["answers"][0]["selected_option_keys"] = ["SCENIC_PHOTO"]
+    res = client.post("/itineraries", json=bad)
+
+    assert res.status_code == 422
+    assert "SCENIC_PHOTO" in res.text

@@ -6,15 +6,15 @@ from langchain_core.language_models.fake_chat_models import FakeListChatModel
 from langchain_core.messages import AIMessage
 
 from travel_ai.generator import ItineraryGenerationError, build_context, build_messages, generate_itinerary
-from travel_ai.schemas import ItineraryRequest
+from travel_ai.schemas import ItineraryRequest, Participant, QuizAnswer
 
 REQUEST = ItineraryRequest.model_validate({
     "city": "도쿄",
     "start_date": "2026-11-03",
     "end_date": "2026-11-03",
     "participants": [
-        {"id": "me", "name": "진수", "quiz_selections": {"1": [1], "3": [2], "8": [1]}},
-        {"id": "friend", "name": "민지", "quiz_selections": {"2": [0], "3": [2], "7": [0]}},
+        {"id": "me", "name": "진수", "answers": [{"question_key": "Q_PLACE", "selected_option_keys": ["HISTORIC_SITE"]}, {"question_key": "Q_FOOD", "selected_option_keys": ["CAFE_TOUR"]}, {"question_key": "Q_RELAXATION", "selected_option_keys": ["HOT_SPRING_SPA"]}]},
+        {"id": "friend", "name": "민지", "answers": [{"question_key": "Q_TIME", "selected_option_keys": ["EXHIBITION"]}, {"question_key": "Q_FOOD", "selected_option_keys": ["CAFE_TOUR"]}, {"question_key": "Q_FREE_TIME", "selected_option_keys": ["SHOPPING"]}]},
     ],
     "conditions": {"companion": "친구", "transport": "대중교통", "budget": "50만원-100만원", "tempo": "여유"},
 })
@@ -126,3 +126,13 @@ def test_rule_violations_fail_after_retries(mutate, message):
 def test_invalid_json_fails():
     with pytest.raises(ItineraryGenerationError):
         generate_itinerary(REQUEST, fake("not json"), max_attempts=1)
+
+
+def test_context_with_participant_without_concepts():
+    req = REQUEST.model_copy(update={"participants": [
+        REQUEST.participants[0],
+        Participant(id="x", name="숙소만", answers=[QuizAnswer(question_key="Q_ACCOMMODATION", selected_option_keys=["GUESTHOUSE"])]),
+    ]})
+    ctx = build_context(req)
+
+    assert ctx["participants"][1]["concepts"] == [] and ctx["participants"][1]["lodging"] == ["게스트하우스"]
