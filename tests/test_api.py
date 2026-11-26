@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import json
 
@@ -5,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from langchain_core.exceptions import ModelAPIError, ModelAuthenticationError
 
+from travel_ai import api
 from travel_ai.api import app, get_llm
 from test_generator import GOOD, REQUEST, fake
 
@@ -89,3 +91,29 @@ def test_unknown_question_key_with_empty_options_is_422(client):
 
     assert res.status_code == 422
     assert "Q_BOGUS" in res.text
+
+
+def test_camel_case_key_is_422(client):
+    use(fake(GOOD))
+    res = client.post("/itineraries", json={**BODY, "specialRequests": "x"})
+    assert res.status_code == 422
+
+
+def test_unknown_option_key_is_422(client):
+    use(fake(GOOD))
+    res = client.post("/itineraries", json={**BODY, "options": {"maxSeparateBlocksPerDay": 2}})
+    assert res.status_code == 422
+
+
+class Slow:
+    async def ainvoke(self, messages):
+        await asyncio.sleep(1)
+
+
+def test_generation_timeout_is_503(client, monkeypatch):
+    monkeypatch.setattr(api, "GENERATION_TIMEOUT_SECONDS", 0.05)
+    use(Slow())
+    res = client.post("/itineraries", json=BODY)
+
+    assert res.status_code == 503
+    assert res.json()["code"] == "LLM_UNAVAILABLE" and res.json()["retryable"] is True

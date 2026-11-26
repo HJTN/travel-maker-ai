@@ -181,6 +181,8 @@ if __name__ == "__main__":
         model=os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
         temperature=0.7,
         response_mime_type="application/json",
+        timeout=60,
+        max_retries=2,
     )
     result = asyncio.run(generate_itinerary(req, model))
     print(result.model_dump_json(by_alias=True, exclude_none=True, indent=2))

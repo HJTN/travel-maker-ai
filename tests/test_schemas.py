@@ -104,10 +104,27 @@ def test_participant_answers_to_selections():
 
 def test_participant_rejects_duplicate_question_key():
     answer = {"question_key": "Q_FOOD", "selected_option_keys": ["CAFE_TOUR"]}
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="중복"):
         Participant.model_validate({"id": "me", "name": "나", "answers": [answer, answer]})
 
 
 def test_special_requests_max_1000():
     with pytest.raises(ValidationError):
         ItineraryRequest.model_validate({**REQUEST, "special_requests": "가" * 1001})
+
+
+def test_unknown_option_key_is_rejected():
+    with pytest.raises(ValidationError):
+        ItineraryRequest.model_validate({**REQUEST, "options": {"maxSeparateBlocksPerDay": 2}})
+
+
+@pytest.mark.parametrize("extra", [{"specialRequests": "x"}, {"quizVersion": "v1.0"}, {"unknown": 1}])
+def test_unknown_top_level_key_is_rejected(extra):
+    with pytest.raises(ValidationError):
+        ItineraryRequest.model_validate({**REQUEST, **extra})
+
+
+def test_unknown_participant_key_is_rejected():
+    p = {**REQUEST["participants"][0], "quizVersion": "v1.0"}
+    with pytest.raises(ValidationError):
+        Participant.model_validate(p)

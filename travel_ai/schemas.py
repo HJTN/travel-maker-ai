@@ -7,7 +7,7 @@ JSON 키는 BE API 와 같은 snake_case 로 주고받는다 (Python 필드명 �
 import datetime as dt
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .quiz import build_profile
 
@@ -18,6 +18,10 @@ class _Model(BaseModel):
 
 # ---------- 입력 ----------
 
+# 입력 모델은 모르는 키를 422로 거부한다. camelCase 키나 오타가 조용히 기본값으로 처리되는 것을 막기 위해서다.
+# (출력 모델은 LLM 출력 검증용이라 forbid 하지 않는다.)
+_FORBID_EXTRA = ConfigDict(extra="forbid")
+
 # 선택지 문자열은 프론트 S05 화면(App.jsx)의 버튼 라벨과 같다.
 Companion = Literal["혼자", "연인", "가족", "친구", "동료"]
 Transport = Literal["대중교통", "도보", "기차", "비행기", "렌트카"]
@@ -26,12 +30,16 @@ Tempo = Literal["여유", "조금 여유", "적당히", "조금 바쁨", "바쁨
 
 
 class QuizAnswer(_Model):
+    model_config = _FORBID_EXTRA
+
     # BE 위키 퀴즈 기준표 v1.0 의 문항·선택지 키 (quiz.QUIZ 참고)
     question_key: str
     selected_option_keys: list[str]
 
 
 class Participant(_Model):
+    model_config = _FORBID_EXTRA
+
     id: str
     name: str
     quiz_version: Literal["v1.0"] = "v1.0"
@@ -41,7 +49,8 @@ class Participant(_Model):
     def _check_answers(self) -> "Participant":
         keys = [a.question_key for a in self.answers]
         if len(keys) != len(set(keys)):
-            raise ValueError("퀴즈 문항 키가 중복되었습니다")
+            dup = next(k for k in keys if keys.count(k) > 1)
+            raise ValueError(f"퀴즈 문항 키가 중복되었습니다: {dup}")
         build_profile(self.selections())  # 모르는 키면 ValueError
         return self
 
@@ -51,6 +60,8 @@ class Participant(_Model):
 
 
 class TripConditions(_Model):
+    model_config = _FORBID_EXTRA
+
     companion: Companion
     transport: Transport
     budget: Budget
@@ -58,11 +69,15 @@ class TripConditions(_Model):
 
 
 class GenerationOptions(_Model):
+    model_config = _FORBID_EXTRA
+
     # 분리 일정이 너무 많아지지 않도록 하루에 둘 수 있는 분리 구간 수
     max_separate_blocks_per_day: int = Field(default=1, ge=0)
 
 
 class ItineraryRequest(_Model):
+    model_config = _FORBID_EXTRA
+
     destination: str = "일본"
     city: str
     start_date: dt.date
@@ -71,6 +86,12 @@ class ItineraryRequest(_Model):
     conditions: TripConditions
     options: GenerationOptions = GenerationOptions()
     special_requests: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("special_requests")
+    @classmethod
+    def _blank_to_none(cls, v: str | None) -> str | None:
+        # 공백만 보내면 요청이 없는 것으로 본다 (프롬프트에 빈 요청이 들어가지 않게)
+        return v if v and v.strip() else None
 
     @model_validator(mode="after")
     def _check(self) -> "ItineraryRequest":

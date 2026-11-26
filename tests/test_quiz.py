@@ -27,6 +27,7 @@ def test_build_profile_counts_and_ratios():
                              "Q_FOOD": ["CAFE_TOUR"], "Q_ACCOMMODATION": ["HOTEL_RESORT"]})
 
     assert profile["concepts"][0] == {"name": "트레킹·등산", "category": "관광", "group": "자연 경관", "count": 2}
+    assert {c["name"] for c in profile["concepts"]} == {"트레킹·등산", "대표 명소", "카페 투어"}
     assert profile["categories"] == {"관광": 0.75, "미식": 0.25, "휴식": 0.0, "체험": 0.0}
     assert profile["lodging"] == ["호텔·리조트"]
 

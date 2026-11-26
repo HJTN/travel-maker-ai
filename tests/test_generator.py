@@ -145,3 +145,10 @@ def test_special_requests_only_in_human_message():
 
     assert "둘째 날 오전은 쉬고 싶어요" in human.content
     assert "둘째 날 오전은 쉬고 싶어요" not in system.content
+
+
+def test_blank_special_requests_is_treated_as_none():
+    req = ItineraryRequest.model_validate({**REQUEST.model_dump(mode="json"), "special_requests": "   "})
+
+    assert req.special_requests is None
+    assert "special_requests" not in build_context(req)

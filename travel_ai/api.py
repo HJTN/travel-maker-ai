@@ -6,6 +6,7 @@ S10 에 보여줄 일정을 돌려준다. 실패하면 ErrorResponse 로 S09 에
 실행: uvicorn travel_ai.api:app --reload   (저장소 루트에서, .env 에 GOOGLE_API_KEY 필요)
 """
 
+import asyncio
 import os
 from functools import lru_cache
 
@@ -20,6 +21,9 @@ from .schemas import ErrorResponse, ItineraryRequest, ItineraryResponse
 
 load_dotenv()
 
+# BE 는 180초까지 기다린다. 서버가 먼저 끝내야 BE 가 S09 용 오류 응답을 받을 수 있다.
+GENERATION_TIMEOUT_SECONDS = 170
+
 app = FastAPI(title="Travel Maker AI")
 
 
@@ -31,6 +35,8 @@ def get_llm():
         model=os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
         temperature=0.7,
         response_mime_type="application/json",
+        timeout=60,  # 호출 1회 상한. 기본값은 무제한
+        max_retries=2,
     )
 
 
@@ -54,7 +60,9 @@ async def create_itinerary(request: ItineraryRequest, llm=Depends(get_llm)):
     if request.city not in CITY_FILES:
         return _error(400, "UNSUPPORTED_CITY", f"지원하지 않는 도시입니다: {request.city} (지원: {', '.join(CITY_FILES)})", False)
     try:
-        return await generate_itinerary(request, llm)
+        return await asyncio.wait_for(generate_itinerary(request, llm), GENERATION_TIMEOUT_SECONDS)
+    except TimeoutError:
+        return _error(503, "LLM_UNAVAILABLE", f"AI 일정 생성이 제한 시간({GENERATION_TIMEOUT_SECONDS}초) 안에 끝나지 않았습니다. 다시 시도해 주세요.", True)
     except ItineraryGenerationError as e:
         # LLM 이 재시도 후에도 규칙에 맞는 일정을 못 만듦. 다시 생성하면 될 수 있다.
         return _error(502, "GENERATION_FAILED", f"일정을 만들지 못했습니다: {e}", True)
