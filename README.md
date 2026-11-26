@@ -176,7 +176,7 @@ AI 서버는 아무것도 저장하지 않습니다(Stateless). 저장은 BE가 
 }
 ```
 
-* `quiz_version`: 선택, 기본값 `"v1.0"`. 알 수 없는 `question_key`·`selected_option_keys`나 중복된 `question_key`는 422입니다.
+* `quiz_version`: 선택, 기본값 `"v1.0"`, v1.0만 허용(다른 값은 422). 알 수 없는 `question_key`·`selected_option_keys`나 중복된 `question_key`는 422입니다.
 * `special_requests`: 선택, 최대 1000자 문자열. 일정 생성 프롬프트에 반영됩니다.
 
 `/itineraries` 응답 (실제 Gemini 기준 1회 30~60초, BE 타임아웃 권장 180초. 배포 후 재측정 필요):

@@ -27,6 +27,6 @@
 | 김지원 | BE | 사용자 인증 및 로그인 API |
 | 전정민 | BE | 사용자 취향 데이터 관리, 사진 퀴즈 API |
 | 정희균 | BE | 여행 일정 관리 API, AI 일정 생성 파이프라인 연동 |
-| 허진수 | AI | LLM 모델 결정, LangChain 일정 생성 플로우, pgvector/Pinecone 구축, 취향 벡터화 (BE와 협업) |
+| 허진수 | AI | LLM 모델 결정, LangChain 일정 생성 플로우, (MVP 이후) pgvector/Pinecone 구축, 취향 벡터화 (BE와 협업) |
 | 김지환 | DE | 비주얼 디자인, 로고 디자인 |
 | 전병진 | DE | 비주얼 디자인, 로고 디자인 |
