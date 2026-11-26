@@ -179,7 +179,7 @@ AI 서버는 아무것도 저장하지 않습니다(Stateless). 저장은 BE가 
 * `quiz_version`: 선택, 기본값 `"v1.0"`, v1.0만 허용(다른 값은 422). 알 수 없는 `question_key`·`selected_option_keys`나 중복된 `question_key`는 422입니다.
 * `special_requests`: 선택, 최대 1000자 문자열. 일정 생성 프롬프트에 반영됩니다.
 
-`/itineraries` 응답 (실제 Gemini 기준 1회 30~60초, BE 타임아웃 권장 180초. 배포 후 재측정 필요):
+`/itineraries` 응답 (LLM 1회 호출 30~60초(호출당 60초 제한), 규칙 위반 시 최대 3회 시도, 서버 전체 상한 170초 → 초과 시 503 `LLM_UNAVAILABLE`. BE 타임아웃 권장 180초(서버 상한보다 크게). 배포 후 재측정 필요):
 
 | 상태 | `code` | `retryable` | 의미 → 화면 |
 | :---: | :--- | :---: | :--- |
@@ -203,13 +203,15 @@ AI 서버는 BE만 호출하는 서버 간 API라서 **비공개** Cloud Run 서
 ```shell
 gcloud config set project <PROJECT_ID>
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com
-printf '%s' "<GOOGLE_API_KEY>" | gcloud secrets create gemini-api-key --data-file=-
+read -rs GOOGLE_API_KEY && printf '%s' "$GOOGLE_API_KEY" | gcloud secrets create gemini-api-key --data-file=-
 ```
 
 ### 2. 배포
 
 ```shell
-gcloud run deploy travel-maker-ai --source . --region asia-northeast3   --no-allow-unauthenticated --timeout 300 --memory 512Mi   --set-secrets GOOGLE_API_KEY=gemini-api-key:latest
+gcloud run deploy travel-maker-ai --source . --region asia-northeast3 \
+  --no-allow-unauthenticated --timeout 300 --memory 512Mi \
+  --set-secrets GOOGLE_API_KEY=gemini-api-key:latest
 ```
 
 빌드 권한 오류가 나면 메시지에 나온 서비스 계정에 `roles/run.builder`, 실행 계정에 `roles/secretmanager.secretAccessor`를 줍니다.
@@ -226,7 +228,9 @@ curl -s -H "Authorization: Bearer $(gcloud auth print-identity-token)" <SERVICE_
 BE 서비스 계정 이메일을 받아 호출 권한(`roles/run.invoker`)을 줍니다. 이 계정만 호출할 수 있습니다.
 
 ```shell
-gcloud run services add-iam-policy-binding travel-maker-ai --region asia-northeast3   --member="serviceAccount:<BE_SA_EMAIL>" --role="roles/run.invoker"
+gcloud run services add-iam-policy-binding travel-maker-ai --region asia-northeast3 \
+  --member="serviceAccount:<BE_SA_EMAIL>" \
+  --role="roles/run.invoker"
 ```
 
 BE는 요청마다 **ID 토큰(audience = 서비스 URL)** 을 `Authorization: Bearer <토큰>` 헤더에 붙여 호출합니다.

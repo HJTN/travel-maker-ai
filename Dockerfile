@@ -1,5 +1,7 @@
 FROM python:3.14-slim
 
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 # 의존성을 먼저 설치해 코드만 바뀔 때 레이어 캐시를 재사용한다
