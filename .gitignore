@@ -1,0 +1,13 @@
+# AI Workflow
+# .*
+# CLAUDE.md
+# GEMINI.md
+
+# Project documentations
+# **/docs/
+
+# Development environment
+__pycache__/
+.pytest_cache/
+.venv/
+.env

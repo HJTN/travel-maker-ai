@@ -73,15 +73,20 @@
 
 ## 🏗️ 아키텍처 구조
 
-> 취향 벡터화, 취향 비교, 일정 생성 파이프라인으로 구성 (예정 구조이며, 구현에 맞춰 수정)
+> AI 파트 전용 저장소입니다. 프론트엔드·백엔드는 각각 별도 저장소에서 관리합니다.
 
 ```text
-gdg-AI/
-├─ preference/      # 취향 퀴즈 결과 → 벡터화 및 VectorDB 저장·업데이트
-|
-├─ matching/        # 동행자 취향 비교, 공통 취향·갈등 영역 분석
-|
-├─ itinerary/       # LangChain 일정 생성 플로우 (공통·분리·번갈아, 추천 이유)
+travel-maker-ai/
+├─ travel_ai/
+│  ├─ quiz.py         # 사진 퀴즈 응답 → 취향 프로필
+│  ├─ taxonomy.py     # 취향 컨셉 분류 (대분류·중분류·소분류)
+│  ├─ compare.py      # 동행자 취향 비교, 공통 취향·갈등 영역 분석
+│  ├─ places.py       # 도시별 장소 후보 (data/)
+│  ├─ generator.py    # LangChain 일정 생성 플로우 (공통·분리·번갈아, 추천 이유)
+│  ├─ schemas.py      # API 입출력 형식
+│  └─ api.py          # FastAPI 서버 (BE 연동용)
+├─ tests/             # pytest (가짜 LLM 사용)
+├─ examples/          # API 요청 예시
 ├─ requirements.txt
 └─ README.md
 ```
@@ -112,7 +117,7 @@ pip install -r requirements.txt
 > Google AI Studio에서 발급한 Gemini API 키와 VectorDB 접속 정보를 `.env`에 넣습니다. `.env`는 커밋하지 않습니다.
 
 ```shell
-# gdg-AI/.env
+# .env (저장소 루트)
 GOOGLE_API_KEY=발급받은_키
 GEMINI_MODEL=gemini-3.6-flash   # 선택. 기본값 gemini-3.6-flash
 ```
