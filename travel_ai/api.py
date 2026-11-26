@@ -3,7 +3,7 @@
 BE(여행 일정 관리 API)가 서버 간 호출로 쓴다: 동행자 전원의 퀴즈 응답과 S05 조건을 모아 보내면
 S10 에 보여줄 일정을 돌려준다. 실패하면 ErrorResponse 로 S09 에서 재시도할지 알려준다.
 
-실행: uvicorn travel_ai.api:app --reload   (gdg-AI 폴더에서, .env 에 GOOGLE_API_KEY 필요)
+실행: uvicorn travel_ai.api:app --reload   (저장소 루트에서, .env 에 GOOGLE_API_KEY 필요)
 """
 
 import os

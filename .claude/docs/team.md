@@ -13,8 +13,8 @@
 | 직렬 | 스택 |
 |---|---|
 | FE | React, JavaScript, Vite, Tailwind CSS |
-| BE | Web Framework (Spring Boot / Node.js 중 결정), DB (미정), Oracle Cloud Infrastructure |
-| AI | Python, LangChain, Google AI Studio (Gemini API), VectorDB (pgvector, Pinecone) |
+| BE | Web Framework (Spring Boot / Node.js 중 결정), DB (미정), Google Cloud Platform (Cloud Run) |
+| AI | Python, LangChain, Google AI Studio (Gemini API), (MVP 이후) VectorDB (pgvector, Pinecone) |
 | DE | Figma, Adobe Illustrator |
 | 협업 | GitHub (Projects, Wiki, Repository), Notion, KakaoTalk |
 

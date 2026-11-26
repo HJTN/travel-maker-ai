@@ -26,8 +26,7 @@
 ## 타입·데이터
 - 공개 함수에는 타입 힌트를 단다. 내장 제네릭(`list[str]`, `dict[str, int]`)을 쓴다 (`typing.List` 쓰지 않음).
 - **입출력 경계(API 요청·응답, LLM 출력)는 Pydantic v2 모델**로 정의한다 (`schemas.py`).
-  - `_Model`을 상속해 JSON 키는 camelCase, Python 속성은 snake_case로 쓴다.
-  - 직렬화할 때 `by_alias=True`를 빠뜨리지 않는다.
+  - `_Model`을 상속해 JSON 키와 Python 속성 모두 BE API와 같은 snake_case로 쓴다 (alias 없음).
   - 선택지가 정해진 값은 `Literal`로 정의하고, 문자열은 프론트 화면 라벨과 같게 맞춘다.
 - 모듈 내부 중간 결과(취향 프로필, 비교 결과 등)는 일반 `dict`/`list`로 둔다. 필요해지기 전에 클래스로 만들지 않는다.
 - 파일을 읽고 쓸 때는 항상 `encoding="utf-8"`, JSON 덤프는 `ensure_ascii=False`.
@@ -39,14 +38,14 @@
 - 처리할 수 없는 예외를 넓게 잡아 삼키지 않는다.
 
 ## LLM
-- LLM 객체는 함수 인자로 주입받는다 (`generate_itinerary(request, llm)`, API에서는 `Depends(get_llm)`). 테스트에서 가짜 LLM으로 바꿀 수 있게 하기 위해서다.
+- LLM 객체는 함수 인자로 주입받는다 (`await generate_itinerary(request, llm)`, API에서는 `Depends(get_llm)`). 테스트에서 가짜 LLM으로 바꿀 수 있게 하기 위해서다.
 - 모델 이름은 `GEMINI_MODEL` 환경변수로 받고, 비밀 값은 `.env`에만 둔다.
 - LLM 출력은 그대로 믿지 않는다. Pydantic 검증 + 규칙 검사 후, 문제를 LLM에 돌려주며 재시도한다.
 - 장소 등 사실 데이터는 LLM이 지어내지 않게 후보 id로만 고르게 하고, 실제 값은 데이터에서 덮어쓴다.
 
 ## 테스트
 - pytest, `tests/test_<모듈>.py`에 `test_<동작>` 형태의 평범한 함수로 쓴다. 클래스로 묶지 않는다.
-- 테스트는 API 키·네트워크 없이 돌아야 한다. LLM은 가짜 객체(`invoke(messages)`를 가진 클래스)로 대체한다.
+- 테스트는 API 키·네트워크 없이 돌아야 한다. LLM은 가짜 객체(`ainvoke(messages)`를 가진 클래스)로 대체한다.
 - 준비 → 빈 줄 → `assert` 순서로 쓰고, 기대값은 가능하면 전체 값을 비교한다.
 - 실행: `python -X utf8 -m pytest -q`. 코드를 바꾸면 커밋 전에 전체 테스트를 돌린다.
 
