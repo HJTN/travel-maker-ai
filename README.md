@@ -192,6 +192,56 @@ AI 서버는 아무것도 저장하지 않습니다(Stateless). 저장은 BE가 
 
 ---
 
+## ☁️ 배포 (GCP Cloud Run)
+
+AI 서버는 BE만 호출하는 서버 간 API라서 **비공개** Cloud Run 서비스로 배포합니다. 리전은 `asia-northeast3`, 요청 타임아웃은 300초입니다 (`/itineraries`가 30~60초 걸림). 서비스 URL은 README에 적지 않고 BE에 따로 전달합니다.
+
+### 1. GCP 준비 (소유자 계정, 1회)
+
+`GOOGLE_API_KEY`는 이미지에 넣지 않고 Secret Manager(`gemini-api-key`)로 주입합니다.
+
+```shell
+gcloud config set project <PROJECT_ID>
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com
+printf '%s' "<GOOGLE_API_KEY>" | gcloud secrets create gemini-api-key --data-file=-
+```
+
+### 2. 배포
+
+```shell
+gcloud run deploy travel-maker-ai --source . --region asia-northeast3   --no-allow-unauthenticated --timeout 300 --memory 512Mi   --set-secrets GOOGLE_API_KEY=gemini-api-key:latest
+```
+
+빌드 권한 오류가 나면 메시지에 나온 서비스 계정에 `roles/run.builder`, 실행 계정에 `roles/secretmanager.secretAccessor`를 줍니다.
+
+### 3. 동작 확인
+
+```shell
+curl -s -H "Authorization: Bearer $(gcloud auth print-identity-token)" <SERVICE_URL>/health
+# {"status":"ok"}  (토큰 없이 호출하면 403)
+```
+
+### 4. BE 호출 권한
+
+BE 서비스 계정 이메일을 받아 호출 권한(`roles/run.invoker`)을 줍니다. 이 계정만 호출할 수 있습니다.
+
+```shell
+gcloud run services add-iam-policy-binding travel-maker-ai --region asia-northeast3   --member="serviceAccount:<BE_SA_EMAIL>" --role="roles/run.invoker"
+```
+
+BE는 요청마다 **ID 토큰(audience = 서비스 URL)** 을 `Authorization: Bearer <토큰>` 헤더에 붙여 호출합니다.
+
+### 로컬 이미지 확인
+
+```shell
+docker build -t travel-maker-ai .
+docker run --rm -d -p 8080:8080 --env-file .env --name tm-ai travel-maker-ai
+curl -s localhost:8080/health   # {"status":"ok"}
+docker stop tm-ai
+```
+
+---
+
 ## 📋 파이프라인 구성
 
 | 호출 시점 | 처리 단계 | 주요 기능 |
