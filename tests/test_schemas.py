@@ -106,3 +106,8 @@ def test_participant_rejects_duplicate_question_key():
     answer = {"question_key": "Q_FOOD", "selected_option_keys": ["CAFE_TOUR"]}
     with pytest.raises(ValidationError):
         Participant.model_validate({"id": "me", "name": "나", "answers": [answer, answer]})
+
+
+def test_special_requests_max_1000():
+    with pytest.raises(ValidationError):
+        ItineraryRequest.model_validate({**REQUEST, "special_requests": "가" * 1001})

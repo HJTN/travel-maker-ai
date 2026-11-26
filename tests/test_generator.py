@@ -136,3 +136,11 @@ def test_context_with_participant_without_concepts():
     ctx = build_context(req)
 
     assert ctx["participants"][1]["concepts"] == [] and ctx["participants"][1]["lodging"] == ["게스트하우스"]
+
+
+def test_special_requests_only_in_human_message():
+    req = REQUEST.model_copy(update={"special_requests": "둘째 날 오전은 쉬고 싶어요"})
+    system, human = build_messages(req)
+
+    assert "둘째 날 오전은 쉬고 싶어요" in human.content
+    assert "둘째 날 오전은 쉬고 싶어요" not in system.content

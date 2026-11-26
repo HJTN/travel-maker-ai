@@ -70,6 +70,7 @@ class ItineraryRequest(_Model):
     participants: list[Participant] = Field(min_length=1)
     conditions: TripConditions
     options: GenerationOptions = GenerationOptions()
+    special_requests: str | None = Field(default=None, max_length=1000)
 
     @model_validator(mode="after")
     def _check(self) -> "ItineraryRequest":

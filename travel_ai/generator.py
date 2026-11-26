@@ -35,6 +35,7 @@ SYSTEM_PROMPT = """너는 동행자들의 서로 다른 취향을 조율해 일�
 - 예산({budget})에 맞게 고른다.
 - reason 에는 누구의 어떤 취향 때문에 골랐는지 참여자 이름으로 한 문장 쓴다. description 은 장소 소개 한두 문장.
 - 같은 장소를 여러 번 넣지 않는다.
+- special_requests 가 있으면 위 규칙을 지키는 범위에서 반영한다.
 
 아래 JSON Schema 를 따르는 JSON 객체 하나만 출력한다. 설명이나 코드블록 표시는 쓰지 않는다.
 {schema}"""
@@ -46,7 +47,7 @@ class ItineraryGenerationError(Exception):
 
 def build_context(request: ItineraryRequest) -> dict:
     profiles = {p.id: build_profile(p.selections()) for p in request.participants}
-    return {
+    context = {
         "destination": request.destination,
         "city": request.city,
         "dates": [str(request.start_date + dt.timedelta(days=i)) for i in range(_day_count(request))],
@@ -59,6 +60,10 @@ def build_context(request: ItineraryRequest) -> dict:
             {k: place[k] for k in ("id", "name", "area", "concepts", "durationMin")} for place in load_places(request.city)
         ],
     }
+    # 사용자 자유 입력이라 시스템 프롬프트가 아닌 HumanMessage 데이터로만 전달한다
+    if request.special_requests:
+        context["special_requests"] = request.special_requests
+    return context
 
 
 def build_messages(request: ItineraryRequest) -> list:
