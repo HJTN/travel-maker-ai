@@ -1,0 +1,9 @@
+pytest
+openpyxl
+pydantic>=2
+langchain-core>=1
+langchain-google-genai>=4
+python-dotenv
+fastapi
+uvicorn
+httpx
